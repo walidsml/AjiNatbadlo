@@ -5,14 +5,21 @@ import org.example.itemservice.Dao.Entity.Item;
 import org.example.itemservice.Dao.Entity.Picture;
 
 import org.example.itemservice.Dao.Repository.ItemRepository;
-import org.example.itemservice.Dto.ItemRequest;
-import org.example.itemservice.Dto.ItemResponse;
+import org.example.itemservice.Dao.Repository.PictureRepository;
+import org.example.itemservice.Dto.ItemDto;
+import org.example.itemservice.Dto.PictureDto;
+import org.example.itemservice.mapper.ItemMapper;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.File;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.io.IOException;
-import java.util.ArrayList;
+
+import reactor.core.scheduler.Schedulers;
+
+
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,80 +29,101 @@ import java.util.stream.Collectors;
 public class ItemServiceImpl implements ItemService {
 
     private final ItemRepository itemRepository;
-
-
+    private final PictureRepository pictureRepository;
+    private final ItemMapper itemMapper;
 
     @Override
-    public ItemResponse createItem(ItemRequest itemRequest, List<MultipartFile> files) throws IOException {
-        // Create the Item
-        Item item = Item.builder()
-                .title(itemRequest.getTitle())
-                .description(itemRequest.getDescription())
-                .category(itemRequest.getCategory())
-                .preferences(itemRequest.getPreferences())
-                .createdAt(new Date())
-                .updatedAt(new Date())
-                .build();
+    public Mono<ItemDto> createItem(Mono<ItemDto> itemDtoMono, Flux<FilePart> pictures) {
+        return itemDtoMono.flatMap(dto -> {
+            Item item = itemMapper.fromItemDtoToItem(dto);
+            item.setCreatedAt(new Date());
+            item.setUpdatedAt(new Date());
 
-        // Handle picture uploads
-        List<Picture> pictures = new ArrayList<>();
-        for (MultipartFile file : files) {
-            // Save file to server (or cloud storage)
-            String uploadDir = "/path/to/upload/directory/"; // Replace with your directory
-            String filePath = uploadDir + file.getOriginalFilename();
-            file.transferTo(new File(filePath));
+            // First, save the item to get its ID
+            return Mono.fromCallable(() -> itemRepository.save(item))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .flatMap(savedItem -> {
+                        if (pictures == null) {
+                            // If no pictures, return the saved item as DTO
+                            return Mono.just(itemMapper.fromItemToItemDto(savedItem));
+                        }
 
-            // Create Picture entity
-            pictures.add(Picture.builder()
-                    .url("http://your-server.com/uploads/" + file.getOriginalFilename()) // Replace with your server URL
-                    .name(file.getOriginalFilename())
-                    .item(item)
-                    .build());
-        }
+                        // If pictures exist, save each picture
+                        return pictures
+                                .flatMap(filePart -> {
+                                    String fileName = filePart.filename();
+                                    String directoryPath = "src/main/resources/static/images/" + savedItem.getId();
+                                    Path directory = Path.of(directoryPath);
 
-        // Associate pictures with the item
-        item.setPictures(pictures);
+                                    // Ensure directory exists
+                                    try {
+                                        Files.createDirectories(directory);
+                                    } catch (IOException e) {
+                                        return Mono.error(new RuntimeException("Could not create directory for storing images", e));
+                                    }
 
-        // Save the item and return the response
-        Item savedItem = itemRepository.save(item);
-        return toItemResponse(savedItem);
+                                    // Define the full path to save the file
+                                    Path filePath = directory.resolve(fileName);
+
+                                    // Save the file
+                                    return filePart.transferTo(filePath)
+                                            .then(Mono.fromCallable(() -> {
+                                                Picture picture = Picture.builder()
+                                                        .url("/images/" + savedItem.getId() + "/" + fileName) // URL for accessing the image
+                                                        .name(fileName)
+                                                        .item(savedItem)
+                                                        .build();
+                                                return pictureRepository.save(picture);
+                                            }).subscribeOn(Schedulers.boundedElastic()));
+                                })
+                                .collectList()
+                                .flatMap(savedPictures -> {
+                                    // Reload the item to include the latest pictures
+                                    return Mono.fromCallable(() -> itemRepository.findById(savedItem.getId()).orElse(null))
+                                            .subscribeOn(Schedulers.boundedElastic())
+                                            .map(itemMapper::fromItemToItemDto);
+                                });
+                    });
+        });
     }
 
-    @Override
-    public ItemResponse getItemById(long id) {
-        return itemRepository.findById(id)
-                .map(this::toItemResponse)
-                .orElseThrow(() -> new RuntimeException("Item not found"));
-    }
+
+
+
 
     @Override
-    public List<ItemResponse> getAllItems() {
-        return itemRepository.findAll()
-                .stream()
-                .map(this::toItemResponse)
+    public ItemDto getItemById(long id) {
+        Item item = itemRepository.findById(id).orElse(null);
+        return itemMapper.fromItemToItemDto(item);
+
+    }
+
+
+
+    @Override
+    public List<ItemDto> getAllItems() {
+        List<Item> items = itemRepository.findAll();
+        // Map each Exchange entity to an ExchangeDto using the ExchangeMapper
+        return items.stream()
+                .map(itemMapper::fromItemToItemDto)
                 .collect(Collectors.toList());
     }
+
 
     @Override
     public void deleteItem(long id) {
         itemRepository.deleteById(id);
     }
 
-    private ItemResponse toItemResponse(Item item) {
-        return ItemResponse.builder()
-                .id(item.getId())
-                .title(item.getTitle())
-                .description(item.getDescription())
-                .category(item.getCategory())
-                .preferences(item.getPreferences())
-                .createdAt(item.getCreatedAt())
-                .updatedAt(item.getUpdatedAt())
-                .pictureUrls( // Map Picture entities to their URLs
-                        item.getPictures().stream()
-                                .map(Picture::getUrl)
-                                .collect(Collectors.toList())
-                )
-                .build();
+
+    @Override
+    public List<ItemDto> findByUserId (String userId){
+        List<Item> items = itemRepository.findByUserId(userId);
+        return items.stream()
+                .map(itemMapper::fromItemToItemDto)
+                .collect(Collectors.toList());
     }
+
+
 
 }

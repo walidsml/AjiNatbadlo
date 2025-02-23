@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+
 @Service
 public class ExchangeServiceImpl implements ExchangeService {
 
@@ -30,4 +31,37 @@ public class ExchangeServiceImpl implements ExchangeService {
                 .collect(Collectors.toList());
     }
 
+
+
+    @Override
+    public List<ExchangeDto> findByReceiverId(String receiverId) {
+        List<Exchange> exchanges = exchangeRepository.findByReceiverId(receiverId);
+        return exchanges.stream()
+                .map(exchangeMapper::fromExchangetoExchangeDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ExchangeDto> findBySenderId(String senderId) {
+        List<Exchange> exchanges = exchangeRepository.findBySenderId(senderId);
+        return exchanges.stream()
+                .map(exchangeMapper::fromExchangetoExchangeDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ExchangeDto> findByStatus(String status) {  // New method
+        return exchangeRepository.findByStatus(status).stream()
+                .map(exchangeMapper::fromExchangetoExchangeDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ExchangeDto> findBySenderIdAndStatus(String senderId, String status) {  // New method
+        return exchangeRepository.findBySenderIdAndStatus(senderId, status).stream()
+                .map(exchangeMapper::fromExchangetoExchangeDto)
+                .collect(Collectors.toList());
+    }
 }
+
+

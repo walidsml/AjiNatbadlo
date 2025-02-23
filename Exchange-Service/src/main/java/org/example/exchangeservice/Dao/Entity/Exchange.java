@@ -18,11 +18,11 @@ import java.util.Date;
 public class Exchange {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long Userid;
-    private long senderId;
-    private long receiverId;
-    private long itemId;
-    private long requestedItemId;
+    private long ExchangeId;
+    private String senderId;
+    private String receiverId;
+    private long SenderitemId;
+    private long ReceiverItemId;
     private String status;
     private Date createdAt;
     private Date updatedAt;

@@ -14,13 +14,12 @@ import java.util.Date;
 @Builder
 public class ExchangeDto {
 
-    private long senderId;
-    private long receiverId;
-    private long itemId;
-    private long requestedItemId;
+    private String senderId;
+    private String receiverId;
+    private long SenderitemId;
+    private long ReceiverItemId;
     private String status;
     private Date createdAt;
     private Date updatedAt;
-
 }
 
