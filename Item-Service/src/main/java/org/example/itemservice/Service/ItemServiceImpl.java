@@ -32,44 +32,99 @@ public class ItemServiceImpl implements ItemService {
     private final PictureRepository pictureRepository;
     private final ItemMapper itemMapper;
 
+//    @Override
+//    public Mono<ItemDto> createItem(Mono<ItemDto> itemDtoMono, Flux<FilePart> pictures) {
+//        return itemDtoMono.flatMap(dto -> {
+//            Item item = itemMapper.fromItemDtoToItem(dto);
+//            Date CreationDate = new Date();
+//            item.setCreatedAt(CreationDate);
+//            item.setUpdatedAt(CreationDate);
+//
+//            // First, save the item to get its ID
+//            return Mono.fromCallable(() -> itemRepository.save(item))
+//                    .subscribeOn(Schedulers.boundedElastic())
+//                    .flatMap(savedItem -> {
+//                        if (pictures == null) {
+//                            // If no pictures, return the saved item as DTO
+//                            return Mono.just(itemMapper.fromItemToItemDto(savedItem));
+//                        }
+//
+//                        // If pictures exist, save each picture
+//                        return pictures
+//                                .flatMap(filePart -> {
+//                                    String fileName = filePart.filename();
+//                                    String directoryPath = "src/main/resources/static/images/" + savedItem.getId();
+//                                    Path directory = Path.of(directoryPath);
+//
+//                                    // Ensure directory exists
+//                                    try {
+//                                        Files.createDirectories(directory);
+//                                    } catch (IOException e) {
+//                                        return Mono.error(new RuntimeException("Could not create directory for storing images", e));
+//                                    }
+//
+//                                    // Define the full path to save the file
+//                                    Path filePath = directory.resolve(fileName);
+//
+//                                    // Save the file
+//                                    return filePart.transferTo(filePath)
+//                                            .then(Mono.fromCallable(() -> {
+//                                                Picture picture = Picture.builder()
+//                                                        .url("/images/" + savedItem.getId() + "/" + fileName) // URL for accessing the image
+//                                                        .name(fileName)
+//                                                        .item(savedItem)
+//                                                        .build();
+//                                                return pictureRepository.save(picture);
+//                                            }).subscribeOn(Schedulers.boundedElastic()));
+//                                })
+//                                .collectList()
+//                                .flatMap(savedPictures -> {
+//                                    // Reload the item to include the latest pictures
+//                                    return Mono.fromCallable(() -> itemRepository.findById(savedItem.getId()).orElse(null))
+//                                            .subscribeOn(Schedulers.boundedElastic())
+//                                            .map(itemMapper::fromItemToItemDto);
+//                                });
+//                    });
+//        });
+//    }
+
+
+
+    // In your service
+    private static final String UPLOAD_DIR = System.getProperty("user.home") + "/uploads/images/";
+
     @Override
     public Mono<ItemDto> createItem(Mono<ItemDto> itemDtoMono, Flux<FilePart> pictures) {
         return itemDtoMono.flatMap(dto -> {
             Item item = itemMapper.fromItemDtoToItem(dto);
-            item.setCreatedAt(new Date());
-            item.setUpdatedAt(new Date());
+            Date creationDate = new Date();
+            item.setCreatedAt(creationDate);
+            item.setUpdatedAt(creationDate);
 
-            // First, save the item to get its ID
             return Mono.fromCallable(() -> itemRepository.save(item))
                     .subscribeOn(Schedulers.boundedElastic())
                     .flatMap(savedItem -> {
                         if (pictures == null) {
-                            // If no pictures, return the saved item as DTO
                             return Mono.just(itemMapper.fromItemToItemDto(savedItem));
                         }
 
-                        // If pictures exist, save each picture
                         return pictures
                                 .flatMap(filePart -> {
-                                    String fileName = filePart.filename();
-                                    String directoryPath = "src/main/resources/static/images/" + savedItem.getId();
+                                    String fileName = System.currentTimeMillis() + "_" + filePart.filename();
+                                    String directoryPath = UPLOAD_DIR + savedItem.getId();
                                     Path directory = Path.of(directoryPath);
 
-                                    // Ensure directory exists
                                     try {
                                         Files.createDirectories(directory);
                                     } catch (IOException e) {
-                                        return Mono.error(new RuntimeException("Could not create directory for storing images", e));
+                                        return Mono.error(new RuntimeException("Could not create directory", e));
                                     }
 
-                                    // Define the full path to save the file
                                     Path filePath = directory.resolve(fileName);
-
-                                    // Save the file
                                     return filePart.transferTo(filePath)
                                             .then(Mono.fromCallable(() -> {
                                                 Picture picture = Picture.builder()
-                                                        .url("/images/" + savedItem.getId() + "/" + fileName) // URL for accessing the image
+                                                        .url("/api/items/images/" + savedItem.getId() + "/" + fileName)  // ← Fixed this line
                                                         .name(fileName)
                                                         .item(savedItem)
                                                         .build();
@@ -78,7 +133,6 @@ public class ItemServiceImpl implements ItemService {
                                 })
                                 .collectList()
                                 .flatMap(savedPictures -> {
-                                    // Reload the item to include the latest pictures
                                     return Mono.fromCallable(() -> itemRepository.findById(savedItem.getId()).orElse(null))
                                             .subscribeOn(Schedulers.boundedElastic())
                                             .map(itemMapper::fromItemToItemDto);
@@ -86,9 +140,6 @@ public class ItemServiceImpl implements ItemService {
                     });
         });
     }
-
-
-
 
 
     @Override

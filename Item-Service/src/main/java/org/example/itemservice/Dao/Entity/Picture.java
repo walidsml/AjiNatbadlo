@@ -14,8 +14,8 @@ public class Picture {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
-    private String url; // URL of the picture
-    private String name; // Optional: Name or description of the picture
+    private String url;
+    private String name;
 
     @ManyToOne
     @JoinColumn(name = "item_id", nullable = false)

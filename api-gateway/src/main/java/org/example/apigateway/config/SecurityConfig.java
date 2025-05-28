@@ -8,28 +8,6 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
-//
-//@Configuration
-//@EnableWebFluxSecurity
-//public class SecurityConfig {
-//
-//    @Bean
-//    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity serverHttpSecurity) {
-//
-//        serverHttpSecurity.csrf()
-//                .disable()
-//                .authorizeExchange(exchange -> exchange
-//                .pathMatchers("/eureka/**")
-//                .permitAll()
-//                .anyExchange()
-//                .authenticated())
-//                .oauth2ResourceServer(ServerHttpSecurity.OAuth2ResourceServerSpec::jwt);
-//        return serverHttpSecurity.build();
-//
-//    }
-//
-//}
-
 
 @Configuration
 @EnableWebFluxSecurity
@@ -42,6 +20,7 @@ public class SecurityConfig {
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers("/eureka/**")
                         .permitAll()
+                        .pathMatchers("/api/items/images/**").permitAll()  // Add this line - allow public images
                         .anyExchange()
                         .authenticated())
                 .oauth2ResourceServer(ServerHttpSecurity.OAuth2ResourceServerSpec::jwt)
